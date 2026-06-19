@@ -218,11 +218,17 @@
       ui.btnPlay.disabled = true; ui.timeline.disabled = true;
       return;
     }
-    const depth = Math.round(result.depth * 10) / 10;
+    // Round the bay depth UP to 0.1cm so the displayed/applied floor is never
+    // shallower than the solved path needs, then snap the path's final pose to
+    // rest flush on that floor (otherwise the installed washer dips into it).
+    const depth = Math.max(0, Math.ceil(result.depth * 10 - 1e-6) / 10);
     state.bayDepth = depth;
     ui.nBay.value = depth;
     ui.hBay.value = Math.min(parseFloat(ui.hBay.max), depth);
     rebuildEnv(); reframe();
+    if (result.path && result.path.length) {
+      result.path[result.path.length - 1] = Model.goalPose(state.dims, depth);
+    }
     state.plan = result;
     state.pose = result.path[0];
 
