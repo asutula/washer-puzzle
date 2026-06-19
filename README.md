@@ -57,8 +57,14 @@ counter)?
 
 - `js/solver.js` answers it with a **breadth-first search over a discretized grid of
   poses** (`x`, `y`, `angle`) — the classic configuration-space approach.
+- The search is **26-connected**: it can move and rotate *at the same time*, which is how
+  you actually pivot a unit under a lip. (A simpler axis-at-a-time search has to
+  "staircase" that motion and over-reports the depth needed for `H > 90`.)
 - Deeper bays only ever add clearance, so feasibility is **monotonic** in depth. The
   optimum is found by **binary search** on the depth, calling the planner at each step.
+- For accuracy the answer is **refined at a fine 1 cm / 1° grid** regardless of the
+  selected search speed (the speed setting only controls how fast the threshold is first
+  bracketed).
 
 Two reference numbers help interpret the result:
 
@@ -75,19 +81,20 @@ Sweeping washer sizes (at the default **68 cm** bay start) shows a sharp regime 
 ```
 H\D        50     60     68     76     84      (min bay depth, cm)
  88       0.0    0.0    0.0    0.0    0.0
- 95       7.6    7.6    7.6   13.2   13.9
-100      10.4   10.4   14.3   19.8   20.2
-108      18.4   18.4   22.2   31.1   37.8
+ 95       5.6    5.6    5.6    6.9    7.4
+100      10.2   10.2   10.2   13.7   15.5
+108      18.2   18.2   18.2   25.2   33.2
 ```
 
-- A washer **shallower than the trench** can be lowered straight into the open area in
-  front of the counter and slid under — bay depth ≈ the static floor.
+- A washer **as deep as the trench or shallower** can be lowered straight into the open
+  area in front of the counter and slid under — bay depth ≈ the static floor.
 - A washer **deeper than the trench** can't be lowered upright; it must be tilted and
   rotated under the counter's front corner, which demands a noticeably deeper bay.
 
 Because the trench width *is* the bay-start distance, widening the bay start moves that
-threshold out — e.g. an 80 × 100 cm washer needs ~40 cm of depth at a 30 cm bay start, but
-only ~10 cm (its static floor) once the bay start is 120 cm. Try it with the slider.
+threshold out — e.g. an 80 × 100 cm washer needs ~39 cm of depth at a 30 cm bay start,
+~14 cm at the default 68 cm, and only ~10 cm (its static floor) once the bay start is
+120 cm. Try it with the slider.
 
 If `H ≤ 90`, the washer fits under the counter with no bay at all.
 
@@ -107,9 +114,12 @@ If `H ≤ 90`, the washer fits under the counter with no bay at all.
 - It's a **2D cross-section**. It ignores the washer's left–right width and any 3D
   wiggle. For a straight in-and-down installation that's the binding plane, but a real
   install has more freedom.
-- The planner works on a **grid**, so the reported depth carries the resolution's slack
-  (finer search → closer to the theoretical `H − 90` floor, but slower). Treat the number
-  as "shallowest *comfortably navigable* depth," and keep a safety margin.
+- The planner works on a **grid**. Even at the fine refine resolution the reported depth
+  is only good to roughly **±1 cm** — pushing finer just trades a lot of time for jitter,
+  not real precision. Treat the number as the *idealized* minimum and **add a safety
+  margin** for a real install (a rigid box with 0 cm of slack does not actually slide in).
+- The model assumes the unit is **rigid** and the bay/counter are exact; it doesn't
+  account for hoses, feet, trim, or having to lift over the front lip.
 
 ## Project layout
 

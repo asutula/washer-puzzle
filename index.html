@@ -66,12 +66,14 @@
       <section class="card">
         <h2>Solve optimal depth</h2>
         <div class="ctrl">
-          <label for="res">Search resolution</label>
+          <label for="res">Search speed</label>
           <select id="res">
-            <option value="coarse">Coarse (fast)</option>
-            <option value="medium" selected>Medium</option>
-            <option value="fine">Fine (slow)</option>
+            <option value="coarse">Coarse bracket (fast)</option>
+            <option value="medium" selected>Medium bracket</option>
+            <option value="fine">Fine throughout (slow)</option>
           </select>
+          <p class="hint">The result is always refined to ~1&nbsp;cm precision; this only
+            sets how fast the initial bracket runs.</p>
         </div>
         <div class="btn-grid">
           <button id="btnSolve" class="btn primary">Find min bay depth</button>

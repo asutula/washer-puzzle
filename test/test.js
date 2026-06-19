@@ -89,6 +89,14 @@ console.log('— solver —');
   const justUnder = Solver.findMinBayDepth({ depth: 60, height: 89 }, 68, { dx: 2.5, dy: 2.5, daDeg: 2.5 });
   console.log(`  89cm washer  -> depth ${justUnder.depth}cm`);
   ok(justUnder.feasible && justUnder.depth === 0, '89cm washer needs no bay (depth 0)');
+
+  // The refine cascade (used by the UI) should land on the same fine-grid answer
+  // regardless of how fast the initial bracket is.
+  const dimsC = { depth: 60, height: 100 };
+  const viaCoarse = Solver.findMinBayDepth(dimsC, 68, { dx: 2.5, dy: 2.5, daDeg: 2.5, refine: true });
+  const viaFine = Solver.findMinBayDepth(dimsC, 68, { dx: 1, dy: 1, daDeg: 1, refine: true });
+  console.log(`  cascade 100x60 -> via coarse ${viaCoarse.depth.toFixed(2)}cm, via fine ${viaFine.depth.toFixed(2)}cm`);
+  ok(Math.abs(viaCoarse.depth - viaFine.depth) < 0.6, 'refine cascade agrees across bracket speeds');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -195,7 +195,7 @@
     ui.btnSolve.disabled = true;
     // Defer so the overlay paints before the (synchronous) search runs.
     setTimeout(() => {
-      const opts = RES[ui.res.value] || RES.medium;
+      const opts = Object.assign({ refine: true }, RES[ui.res.value] || RES.medium);
       const t0 = performance.now();
       let result;
       try {
@@ -240,7 +240,9 @@
       row('Search time', ms + ' ms') +
       '</table>' +
       '<div class="small" style="margin-top:6px">Press <b>Play insertion</b> or drag the ' +
-      'timeline to watch it go in.</div>';
+      'timeline to watch it go in.</div>' +
+      '<div class="small" style="margin-top:4px;opacity:.8">Grid precision ≈ ±1&nbsp;cm — ' +
+      'add a safety margin for a real install.</div>';
     render();
   }
   function row(a, b) { return '<tr><td>' + a + '</td><td>' + b + '</td></tr>'; }
