@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Washer Bay Puzzle</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="panel">
+      <h1>Washer Bay Puzzle</h1>
+      <p class="sub">Find the shallowest floor bay that lets a washer rotate into place under the counter.</p>
+
+      <section class="card">
+        <h2>Washer</h2>
+        <div class="ctrl">
+          <label for="nHeight">Height <span class="unit">cm</span></label>
+          <div class="row">
+            <input type="range" id="hHeight" min="60" max="140" step="0.5" value="95" />
+            <input type="number" id="nHeight" min="30" max="160" step="0.5" value="95" />
+          </div>
+        </div>
+        <div class="ctrl">
+          <label for="nDepth">Depth <span class="unit">cm</span></label>
+          <div class="row">
+            <input type="range" id="hDepth" min="40" max="90" step="0.5" value="60" />
+            <input type="number" id="nDepth" min="20" max="120" step="0.5" value="60" />
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Bay depth <span class="unit">cm</span></h2>
+        <div class="ctrl">
+          <div class="row">
+            <input type="range" id="hBay" min="0" max="80" step="0.5" value="20" />
+            <input type="number" id="nBay" min="0" max="120" step="0.5" value="20" />
+          </div>
+        </div>
+        <p class="hint">Fixed: counter bottom <b>90&nbsp;cm</b>, step <b>68&nbsp;cm</b> from counter edge.</p>
+      </section>
+
+      <section class="card">
+        <h2>Move the washer</h2>
+        <div class="btn-grid">
+          <button id="btnStart" class="btn">Start pose</button>
+          <button id="btnGoal" class="btn">Installed pose</button>
+        </div>
+        <div class="ctrl">
+          <label>Angle <span id="angleVal" class="mono">0°</span></label>
+          <input type="range" id="hAngle" min="-95" max="20" step="0.5" value="0" />
+        </div>
+        <p class="hint">Drag the washer to move it. Scroll or use <kbd>Q</kbd>/<kbd>E</kbd> to rotate, arrows to nudge.</p>
+        <div id="status" class="status clear">Clear</div>
+      </section>
+
+      <section class="card">
+        <h2>Solve optimal depth</h2>
+        <div class="ctrl">
+          <label for="res">Search resolution</label>
+          <select id="res">
+            <option value="coarse">Coarse (fast)</option>
+            <option value="medium" selected>Medium</option>
+            <option value="fine">Fine (slow)</option>
+          </select>
+        </div>
+        <div class="btn-grid">
+          <button id="btnSolve" class="btn primary">Find min bay depth</button>
+          <button id="btnPlay" class="btn" disabled>Play insertion</button>
+        </div>
+        <input type="range" id="timeline" min="0" max="1000" step="1" value="0" disabled />
+        <div id="result" class="result"></div>
+      </section>
+
+      <section class="card">
+        <button id="btnReset" class="btn ghost full">Reset everything</button>
+        <p class="hint about">Side-view cross-section. The washer is a rigid rectangle; the
+          counter, floor and bay are immovable solids. Collision is exact (SAT); the optimizer
+          searches the washer's position+angle space for a path from the start to fully installed.</p>
+      </section>
+    </aside>
+
+    <main id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="solving" class="overlay hidden">Solving…</div>
+    </main>
+  </div>
+
+  <script src="js/geometry.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/solver.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

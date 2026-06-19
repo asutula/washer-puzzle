@@ -1,0 +1,11 @@
+{
+  "name": "washer-puzzle",
+  "version": "1.0.0",
+  "description": "Interactive 2D model to find the shallowest floor bay for installing a washer under a counter.",
+  "scripts": {
+    "test": "node test/test.js && node test/smoke.js",
+    "serve": "python3 -m http.server 8000"
+  },
+  "license": "MIT",
+  "private": true
+}
