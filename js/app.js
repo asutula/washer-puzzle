@@ -241,8 +241,12 @@
       '</table>' +
       '<div class="small" style="margin-top:6px">Press <b>Play insertion</b> or drag the ' +
       'timeline to watch it go in.</div>' +
-      '<div class="small" style="margin-top:4px;opacity:.8">Grid precision ≈ ±1&nbsp;cm — ' +
-      'add a safety margin for a real install.</div>';
+      (result.validated
+        ? '<div class="small" style="margin-top:4px;opacity:.8">✓ Insertion path is ' +
+          'collision-validated (dense sub-step checks). Still leave a small real-world ' +
+          'margin for hoses, feet and trim.</div>'
+        : '<div class="small" style="margin-top:4px;opacity:.8">Approximate (path not fully ' +
+          'validated) — add a safety margin.</div>');
     render();
   }
   function row(a, b) { return '<tr><td>' + a + '</td><td>' + b + '</td></tr>'; }

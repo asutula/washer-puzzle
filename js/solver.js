@@ -107,8 +107,10 @@
 
     // free cache: 0 unknown, 1 free, 2 blocked
     const free = new Uint8Array(N);
+    const blocked = (opts && opts.blocked) || null;
     function isFree(i, j, k) {
       const id = idx(i, j, k);
+      if (blocked && blocked.has(id)) return false;
       let v = free[id];
       if (v === 0) {
         v = Model.collides(poseAt(g, i, j, k), dims, env) ? 2 : 1;
@@ -177,100 +179,188 @@
 
     if (!found) return { feasible: false, path: [], stats, env };
 
-    // Reconstruct path goal -> start, then reverse.
+    // Reconstruct path goal -> start, then reverse. Keep the grid node ids too,
+    // so callers can block specific cells and replan (lazy path validation).
     const path = [];
+    const nodeIds = [];
     let cur = goalId;
     while (cur !== -1) {
       const k = cur % g.na;
       const j = ((cur - k) / g.na) % g.ny;
       const i = ((cur - k) / g.na - j) / g.ny;
       path.push(poseAt(g, i, j, k));
+      nodeIds.push(cur);
       if (cur === startId) break;
       cur = parent[cur];
     }
     path.reverse();
+    nodeIds.reverse();
     // Pin the exact upright start/goal at the ends for a clean animation.
     path.unshift(Model.startPose(dims, bayStart));
     path.push(Model.goalPose(dims, depth));
-    return { feasible: true, path, stats, env };
+    return { feasible: true, path, nodeIds, startId, goalId, stats, env };
   }
 
   function feasible(dims, depth, bayStart, opts) {
     return planAtDepth(dims, depth, bayStart, opts).feasible;
   }
 
+  /** Dense sub-step collision check of one path segment (continuous motion). */
+  function segmentClear(a, b, dims, env, vopts) {
+    const stepCm = (vopts && vopts.stepCm) || 0.2;
+    const stepRad = ((vopts && vopts.stepDeg) || 0.2) * DEG;
+    const n = Math.max(1, Math.ceil(Math.max(
+      Math.hypot(b.x - a.x, b.y - a.y) / stepCm, Math.abs(b.angle - a.angle) / stepRad)));
+    for (let t = 1; t <= n; t++) {
+      const u = t / n;
+      if (Model.collides({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u,
+                           angle: a.angle + (b.angle - a.angle) * u }, dims, env)) return false;
+    }
+    return true;
+  }
+
+  /** Whole-path dense validation (boolean). */
+  function validatePath(path, dims, env, vopts) {
+    if (!path || path.length < 2) return !!path;
+    for (let s = 0; s < path.length - 1; s++)
+      if (!segmentClear(path[s], path[s + 1], dims, env, vopts)) return false;
+    return true;
+  }
+
   /**
-   * Binary-search the bay-depth feasibility threshold at a fixed resolution.
-   * Expands the bracket so that `lo` is infeasible and `hi` feasible, then
-   * narrows to `tol`. Returns the shallowest feasible depth and its plan.
+   * Plan a path whose *continuous* motion is collision-free. A grid path only
+   * checks its node poses, so a diagonal step can "graze" an obstacle between
+   * nodes. We densely validate the path and, where a segment grazes, block the
+   * grid cells it touches and replan — rerouting around incidental grazes. If no
+   * grazeless path exists at this depth, returns infeasible (caller deepens).
    */
-  function searchThreshold(dims, bayStart, res, tol, floor, loStart, hiStart) {
+  function planClean(dims, depth, bayStart, res, vopts, budget) {
+    const blocked = new Set();
+    const maxPasses = (vopts && vopts.maxPasses) || 12;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      if (budget && --budget.n < 0) return { feasible: false, exhausted: true };
+      const pl = planAtDepth(dims, depth, bayStart, Object.assign({}, res, { blocked }));
+      if (!pl.feasible) return { feasible: false };
+      const ids = pl.nodeIds, L = ids.length, path = pl.path;
+      let grazed = false, added = 0;
+      const block = (nid) => {
+        if (nid === pl.startId || nid === pl.goalId) return;
+        if (!blocked.has(nid)) { blocked.add(nid); added++; }
+      };
+      for (let s = 0; s < path.length - 1; s++) {
+        if (segmentClear(path[s], path[s + 1], dims, pl.env, vopts)) continue;
+        grazed = true;
+        if (s <= L - 1) block(ids[s]);       // grid node at path[s+1]
+        if (s >= 1 && s <= L) block(ids[s - 1]); // grid node at path[s]
+      }
+      if (!grazed) return pl;            // fully validated path
+      if (added === 0) return { feasible: false }; // only un-blockable grazes -> deepen
+    }
+    return { feasible: false, exhausted: true };
+  }
+
+  /**
+   * Binary-search the bay-depth feasibility threshold. `probe(depth)` returns a
+   * plan-like object ({feasible, ...}); expands the bracket so `lo` is infeasible
+   * and `hi` feasible, then narrows to `tol`. Assumes probe(loStart) infeasible.
+   */
+  function searchThreshold(dims, tol, floor, loStart, hiStart, probe) {
     const hardCap = dims.height + 90;
     const grow = Math.max(2, tol * 4);
-    let hi = hiStart, g = 0;
-    while (!feasible(dims, hi, bayStart, res) && hi < hardCap && g++ < 80) hi += grow;
-    if (!feasible(dims, hi, bayStart, res)) return { feasible: false, iters: g };
+    let hi = hiStart, g = 0, hp = probe(hi);
+    while (!hp.feasible && hi < hardCap && g++ < 80) { hi += grow; hp = probe(hi); }
+    if (!hp.feasible) return { feasible: false, iters: g };
     let lo = Math.max(floor, loStart);
     g = 0;
-    while (lo > floor && feasible(dims, lo, bayStart, res) && g++ < 80) lo -= grow;
+    while (lo > floor && probe(lo).feasible && g++ < 80) lo -= grow;
     if (lo < floor) lo = floor;
-    let plan = planAtDepth(dims, hi, bayStart, res);
-    let iters = g;
+    let plan = hp, iters = g;
     while (hi - lo > tol) {
       const mid = (lo + hi) / 2; iters++;
-      const p = planAtDepth(dims, mid, bayStart, res);
+      const p = probe(mid);
       if (p.feasible) { hi = mid; plan = p; } else { lo = mid; }
     }
     return { feasible: true, depth: hi, plan, iters };
   }
 
   /**
+   * From a geometric threshold `d0`, find the shallowest depth (>= d0) that has a
+   * densely-validated, grazeless insertion path. Bounded by a total replan budget.
+   */
+  function cleanUp(dims, bayStart, fine, vopts, d0, fallback) {
+    const step = Math.max(0.5, vopts.tolerance * 2);
+    const budget = { n: 32 };
+    let iters = 0;
+    for (let b = 0; b <= 12; b++) {
+      const depth = d0 + b * step;
+      const pc = planClean(dims, depth, bayStart, fine, vopts, budget);
+      iters++;
+      if (pc.feasible) return { depth, path: pc.path, validated: true, iters };
+      if (pc.exhausted) break;
+    }
+    return { depth: d0, path: fallback ? fallback.path : [], validated: false, iters };
+  }
+
+  /**
    * Find the shallowest bay depth that admits an insertion path, for a given
    * (fixed) bay start distance.
    *
-   * With `opts.refine` (set by the UI), the answer is always pinned at a fine
-   * resolution: the selected resolution only brackets the threshold cheaply,
-   * then a precise pass at 1cm/1deg nails it down. This matters most for H > 90,
-   * where the result is dominated by the rotate-under-the-corner maneuver.
+   * With `opts.refine` (set by the UI): bracket the threshold at the selected
+   * speed, pin it at a fine 1cm/1deg grid, then return the shallowest depth whose
+   * path is **densely collision-validated** (grazeless continuous motion). The
+   * grid search can cut corners by sub-cell amounts (optimistic); validation
+   * reroutes around incidental grazes and deepens the bay only when a maneuver
+   * genuinely needs it — so the reported depth is provably achievable, not
+   * optimistic. This matters most for H > 90 (the rotate-under-the-corner pivot).
    *
    * @returns {{depth:number|null, feasible:boolean, staticMin:number,
-   *            path:Array<pose>, iterations:number, tolerance:number}}
+   *            path:Array<pose>, iterations:number, tolerance:number, validated:boolean}}
    */
   function findMinBayDepth(dims, bayStart, opts) {
     const o = Object.assign({ tolerance: 0.25 }, opts);
     const staticMin = Model.staticMinDepth(dims);
     const fine = { dx: 1, dy: 1, daDeg: 1, conn: o.conn || DEFAULTS.conn, maxNodes: o.maxNodes };
     const hiHint = staticMin + Math.max(12, dims.height * 0.5);
+    const gridProbe = (res) => (depth) => planAtDepth(dims, depth, bayStart, res);
 
-    // H <= 90: the washer slides straight in upright; no bay needed. Check at the
-    // fine resolution so the tight slide-in is never missed.
-    if (staticMin <= 0 && feasible(dims, 0, bayStart, fine)) {
-      const plan = planAtDepth(dims, 0, bayStart, fine);
-      return { depth: 0, feasible: true, staticMin, path: plan.path, iterations: 1, tolerance: o.tolerance };
+    const mk = (depth, path, iters, validated) =>
+      ({ depth, feasible: true, staticMin, path, iterations: iters, tolerance: o.tolerance, validated });
+    const mkInf = (iters) =>
+      ({ depth: null, feasible: false, staticMin, path: [], iterations: iters, tolerance: o.tolerance, validated: false });
+
+    // H <= 90: the washer slides straight in upright; no bay needed.
+    if (staticMin <= 0) {
+      if (o.refine) {
+        const pc = planClean(dims, 0, bayStart, fine, o, { n: 12 });
+        if (pc.feasible) return mk(0, pc.path, 1, true);
+      } else if (feasible(dims, 0, bayStart, fine)) {
+        return mk(0, planAtDepth(dims, 0, bayStart, fine).path, 1, false);
+      }
     }
 
+    // Without refine: a single deterministic grid search at the given resolution.
+    if (!o.refine) {
+      const r = searchThreshold(dims, o.tolerance, staticMin, staticMin, hiHint, gridProbe(o));
+      return r.feasible ? mk(r.depth, r.plan.path, r.iters, false) : mkInf(r.iters);
+    }
+
+    // Refine: bracket (selected res) -> fine grid threshold -> validated clean-up.
     const selDx = (opts && opts.dx) || DEFAULTS.dx;
-    const done = (r, extraIters) => r.feasible
-      ? { depth: r.depth, feasible: true, staticMin, path: r.plan.path,
-          iterations: r.iters + (extraIters || 0), tolerance: o.tolerance }
-      : { depth: null, feasible: false, staticMin, path: [],
-          iterations: r.iters + (extraIters || 0), tolerance: o.tolerance };
-
-    // Single precise pass when not refining, or already at fine resolution.
-    if (!o.refine || selDx <= fine.dx + 1e-9) {
-      const res = o.refine ? fine : o;
-      return done(searchThreshold(dims, bayStart, res, o.tolerance, staticMin, staticMin, hiHint));
+    let d0, fallback, iters;
+    if (selDx <= fine.dx + 1e-9) {
+      const r = searchThreshold(dims, o.tolerance, staticMin, staticMin, hiHint, gridProbe(fine));
+      if (!r.feasible) return mkInf(r.iters);
+      d0 = r.depth; fallback = r.plan; iters = r.iters;
+    } else {
+      const br = searchThreshold(dims, 1.5, staticMin, staticMin, hiHint, gridProbe(o));
+      if (!br.feasible) return mkInf(br.iters);
+      const rf = searchThreshold(dims, o.tolerance, staticMin, br.depth - 2, br.depth + 2, gridProbe(fine));
+      const rr = rf.feasible ? rf : br;
+      d0 = rr.depth; fallback = rr.plan; iters = br.iters + rf.iters;
     }
-
-    // Phase 1: cheap bracket at the selected resolution.
-    const bracket = searchThreshold(dims, bayStart, o, 1.5, staticMin, staticMin, hiHint);
-    if (!bracket.feasible) return done(bracket);
-
-    // Phase 2: precise refine at fine resolution around the bracket.
-    const refined = searchThreshold(dims, bayStart, fine, o.tolerance, staticMin,
-                                    bracket.depth - 3, bracket.depth + 1);
-    return done(refined.feasible ? refined : bracket, bracket.iters);
+    const cleaned = cleanUp(dims, bayStart, fine, o, d0, fallback);
+    return mk(cleaned.depth, cleaned.path, iters + cleaned.iters, cleaned.validated);
   }
 
-  return { makeGrid, planAtDepth, feasible, searchThreshold, findMinBayDepth, DEFAULTS };
+  return { makeGrid, planAtDepth, feasible, segmentClear, validatePath, planClean, searchThreshold, findMinBayDepth, DEFAULTS };
 });

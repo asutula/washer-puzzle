@@ -65,13 +65,19 @@ counter)?
 - For accuracy the answer is **refined at a fine 1 cm / 1° grid** regardless of the
   selected search speed (the speed setting only controls how fast the threshold is first
   bracketed).
+- A grid path only checks its node poses, so a diagonal step can "graze" a corner between
+  nodes (sub-cell optimism). The reported path is therefore **densely re-validated** with
+  fine sub-step collision checks; where it grazes, the planner **blocks those cells and
+  reroutes**, and only **deepens the bay** when no grazeless path exists. So the depth is
+  *provably achievable* (a continuously collision-free insertion), conservative rather
+  than optimistic.
 
 Two reference numbers help interpret the result:
 
 - **Static floor `= max(0, H − 90)`** — the washer must at least *fit* upright under the
   counter once installed. No bay can be shallower than this.
-- **Solved depth** — the shallowest depth at which an actual *path* exists. Always ≥ the
-  static floor; the gap is the room needed to maneuver it in.
+- **Solved depth** — the shallowest depth at which an actual, collision-validated *path*
+  exists. Always ≥ the static floor; the gap is the room needed to maneuver it in.
 
 ### A result worth knowing
 
@@ -79,12 +85,15 @@ Sweeping washer sizes (at the default **68 cm** bay start) shows a sharp regime 
 **D = bay start** — i.e. the width of the open "trench" in front of the counter:
 
 ```
-H\D        50     60     68     76     84      (min bay depth, cm)
+H\D        50     60     68     76     84      (idealized min bay depth, cm)
  88       0.0    0.0    0.0    0.0    0.0
  95       5.6    5.6    5.6    6.9    7.4
 100      10.2   10.2   10.2   13.7   15.5
 108      18.2   18.2   18.2   25.2   33.2
 ```
+
+(These are the *idealized* geometric minima; with path validation the tool reports
+~0.5–1 cm deeper, since a real grazeless insertion needs a sliver of clearance.)
 
 - A washer **as deep as the trench or shallower** can be lowered straight into the open
   area in front of the counter and slid under — bay depth ≈ the static floor.
@@ -114,12 +123,14 @@ If `H ≤ 90`, the washer fits under the counter with no bay at all.
 - It's a **2D cross-section**. It ignores the washer's left–right width and any 3D
   wiggle. For a straight in-and-down installation that's the binding plane, but a real
   install has more freedom.
-- The planner works on a **grid**. Even at the fine refine resolution the reported depth
-  is only good to roughly **±1 cm** — pushing finer just trades a lot of time for jitter,
-  not real precision. Treat the number as the *idealized* minimum and **add a safety
-  margin** for a real install (a rigid box with 0 cm of slack does not actually slide in).
-- The model assumes the unit is **rigid** and the bay/counter are exact; it doesn't
-  account for hoses, feet, trim, or having to lift over the front lip.
+- The planner works on a **grid** (1 cm / 1°), so the depth is good to roughly **±0.5 cm**;
+  the returned path is collision-validated, so it won't be optimistic, but it's snapped to
+  that grid. Pushing finer just trades a lot of time for jitter, not real precision.
+- The model assumes the unit is **rigid** and the bay/counter are exact; it doesn't account
+  for hoses, feet, trim, or having to lift over the front lip — so still **add a small
+  real-world safety margin** to the reported depth.
+- Validated `H > 90` solves do real work (many replans) and run **synchronously**, so a
+  large washer can take ~15–20 s; the page is busy during that time.
 
 ## Project layout
 

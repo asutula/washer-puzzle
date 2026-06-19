@@ -68,6 +68,9 @@ try {
   console.log('  ✓ all scripts loaded & app booted');
 
   // Solve (setTimeout is synchronous in the harness, so this runs the search).
+  // Use a short (H<=90) washer so this wiring check stays fast; the H>90
+  // validated optimizer is covered by test/test.js.
+  getEl('nHeight').value = '82'; getEl('nHeight')._fire('input');
   getEl('res').value = 'coarse';
   getEl('btnSolve')._fire('click');
   const res = getEl('result');

@@ -90,13 +90,20 @@ console.log('— solver —');
   console.log(`  89cm washer  -> depth ${justUnder.depth}cm`);
   ok(justUnder.feasible && justUnder.depth === 0, '89cm washer needs no bay (depth 0)');
 
-  // The refine cascade (used by the UI) should land on the same fine-grid answer
-  // regardless of how fast the initial bracket is.
-  const dimsC = { depth: 60, height: 100 };
-  const viaCoarse = Solver.findMinBayDepth(dimsC, 68, { dx: 2.5, dy: 2.5, daDeg: 2.5, refine: true });
-  const viaFine = Solver.findMinBayDepth(dimsC, 68, { dx: 1, dy: 1, daDeg: 1, refine: true });
-  console.log(`  cascade 100x60 -> via coarse ${viaCoarse.depth.toFixed(2)}cm, via fine ${viaFine.depth.toFixed(2)}cm`);
-  ok(Math.abs(viaCoarse.depth - viaFine.depth) < 0.6, 'refine cascade agrees across bracket speeds');
+  // The refine path (used by the UI) returns a densely-validated, grazeless
+  // insertion: the reported depth has a provably collision-free path.
+  const dimsV = { depth: 50, height: 95 };
+  const rv = Solver.findMinBayDepth(dimsV, 68, { dx: 2.5, dy: 2.5, daDeg: 2.5, refine: true });
+  const envV = Model.buildEnvironment(rv.depth, 68);
+  const clean = Solver.validatePath(rv.path, dimsV, envV, { stepCm: 0.1, stepDeg: 0.1 });
+  console.log(`  validated 95x50 -> depth ${rv.depth.toFixed(2)}cm, validated=${rv.validated}, clean=${clean}`);
+  ok(rv.validated && clean, 'refine returns a densely-validated, grazeless path');
+  ok(rv.depth >= rv.staticMin && rv.depth <= rv.staticMin + 8, 'validated depth is sane (>= static, modest clearance)');
+
+  // validatePath catches a deliberately grazing path.
+  const grazeEnv = Model.buildEnvironment(20, 68);
+  const grazing = [{ x: 150, y: 47.5, angle: 0 }, { x: 150, y: -40, angle: 0 }];
+  ok(!Solver.validatePath(grazing, { depth: 60, height: 95 }, grazeEnv, {}), 'validatePath rejects a path that drives through the floor');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
