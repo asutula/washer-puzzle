@@ -28,7 +28,7 @@
     daDeg: 3,       // deg  grid spacing in angle
     angleMinDeg: -93, // tilt top toward the open side (clockwise) ...
     angleMaxDeg: 15,  // ... with a little slack the other way
-    maxNodes: 4000000,
+    maxNodes: 9000000,
   };
 
   /** Build the discretised configuration grid for one (dims, depth, bayStart). */

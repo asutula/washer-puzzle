@@ -82,6 +82,13 @@ console.log('— solver —');
   console.log(`  deep washer  -> wide-start ${wide.depth}cm vs narrow-start ${narrow.depth}cm`);
   ok(wide.feasible && narrow.feasible, 'deep washer feasible at both bay starts');
   ok(wide.depth < narrow.depth, 'wider bay start needs a shallower bay');
+
+  // Regression: a washer just under the counter height (H <= 90) needs no bay.
+  // The grid must be fine enough to thread the tight straight slide-in — at the
+  // old 3cm spacing this was wrongly reported as ~1.7cm.
+  const justUnder = Solver.findMinBayDepth({ depth: 60, height: 89 }, 68, { dx: 2.5, dy: 2.5, daDeg: 2.5 });
+  console.log(`  89cm washer  -> depth ${justUnder.depth}cm`);
+  ok(justUnder.feasible && justUnder.depth === 0, '89cm washer needs no bay (depth 0)');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

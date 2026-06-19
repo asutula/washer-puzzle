@@ -6,9 +6,9 @@
   const DEG = Math.PI / 180;
 
   const RES = {
-    coarse: { dx: 5, dy: 5, daDeg: 5 },
-    medium: { dx: 3, dy: 3, daDeg: 3 },
-    fine:   { dx: 2, dy: 2, daDeg: 2 },
+    coarse: { dx: 2.5, dy: 2.5, daDeg: 2.5 },
+    medium: { dx: 1.5, dy: 1.5, daDeg: 1.5 },
+    fine:   { dx: 1, dy: 1, daDeg: 1 },
   };
 
   const canvas = document.getElementById('canvas');
