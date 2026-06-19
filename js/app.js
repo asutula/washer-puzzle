@@ -17,6 +17,7 @@
   const state = {
     dims: { depth: 60, height: 95 },
     bayDepth: 20,
+    bayStart: 68,
     pose: { x: 0, y: 0, angle: 0 },
     env: null,
     plan: null,            // last solve result {depth, path, ...}
@@ -30,6 +31,7 @@
     hHeight: el('hHeight'), nHeight: el('nHeight'),
     hDepth: el('hDepth'), nDepth: el('nDepth'),
     hBay: el('hBay'), nBay: el('nBay'),
+    hBayStart: el('hBayStart'), nBayStart: el('nBayStart'),
     hAngle: el('hAngle'), angleVal: el('angleVal'),
     status: el('status'), res: el('res'),
     btnStart: el('btnStart'), btnGoal: el('btnGoal'),
@@ -40,7 +42,7 @@
   };
 
   // ---- helpers ----
-  function rebuildEnv() { state.env = Model.buildEnvironment(state.bayDepth); }
+  function rebuildEnv() { state.env = Model.buildEnvironment(state.bayDepth, state.bayStart); }
 
   function pointInPoly(pt, poly) {
     let inside = false;
@@ -76,7 +78,7 @@
     syncAngleUI();
   }
 
-  function reframe() { renderer.resize(); renderer.setView(state.dims, state.bayDepth); }
+  function reframe() { renderer.resize(); renderer.setView(state.dims, state.bayDepth, state.bayStart); }
 
   function invalidatePlan() {
     state.plan = null;
@@ -88,7 +90,7 @@
   }
 
   // ---- pose presets ----
-  function goStart() { state.pose = Model.startPose(state.dims); render(); }
+  function goStart() { state.pose = Model.startPose(state.dims, state.bayStart); render(); }
   function goGoal() { state.pose = Model.goalPose(state.dims, state.bayDepth); render(); }
 
   // ---- parameter inputs ----
@@ -111,6 +113,9 @@
   bindPair(ui.hBay, ui.nBay, (v) => {
     state.bayDepth = v; rebuildEnv(); reframe(); invalidatePlan(); render();
   });
+  bindPair(ui.hBayStart, ui.nBayStart, (v) => {
+    state.bayStart = v; rebuildEnv(); reframe(); invalidatePlan(); render();
+  });
 
   ui.hAngle.addEventListener('input', () => {
     state.pose.angle = parseFloat(ui.hAngle.value) * DEG; render();
@@ -121,9 +126,11 @@
   ui.btnReset.addEventListener('click', () => {
     state.dims = { depth: 60, height: 95 };
     state.bayDepth = 20;
+    state.bayStart = 68;
     ui.nHeight.value = ui.hHeight.value = 95;
     ui.nDepth.value = ui.hDepth.value = 60;
     ui.nBay.value = ui.hBay.value = 20;
+    ui.nBayStart.value = ui.hBayStart.value = 68;
     rebuildEnv(); reframe(); invalidatePlan(); goStart();
   });
 
@@ -192,7 +199,7 @@
       const t0 = performance.now();
       let result;
       try {
-        result = Solver.findMinBayDepth(state.dims, opts);
+        result = Solver.findMinBayDepth(state.dims, state.bayStart, opts);
       } finally {
         ui.solving.classList.add('hidden');
         ui.btnSolve.disabled = false;
@@ -229,6 +236,7 @@
       row('Static fit floor', result.staticMin.toFixed(1) + ' cm') +
       row('Clearance to maneuver', (depth - result.staticMin).toFixed(1) + ' cm') +
       row('Washer', state.dims.height + ' × ' + state.dims.depth + ' cm') +
+      row('Bay start', state.bayStart + ' cm') +
       row('Search time', ms + ' ms') +
       '</table>' +
       '<div class="small" style="margin-top:6px">Press <b>Play insertion</b> or drag the ' +

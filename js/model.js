@@ -13,8 +13,8 @@
  *                                      standard floor
  *                              ┌───────────────────  y = 0 (fixed)
  *      bay floor               │
- *   ───────────────────────────┘  step at x = STEP_X (68, fixed)
- *   y = -bayDepth              x=STEP_X
+ *   ───────────────────────────┘  step at x = bayStart (default 68)
+ *   y = -bayDepth              x=bayStart
  *
  * The washer lives in the open air between the counter bottom and the floor.
  */
@@ -31,8 +31,13 @@
   const COUNTER_BOTTOM = 90;   // bottom face of countertop above standard floor
   const COUNTER_THICKNESS = 10; // countertop slab thickness (visual; top face only)
   const COUNTER_TOP = COUNTER_BOTTOM + COUNTER_THICKNESS;
-  const STEP_X = 68;           // step starts 68cm out from counter front edge
   const FRONT_EDGE_X = 0;      // counter front edge defines x = 0
+
+  // Default distance the step sits out from the counter front edge. This is now
+  // configurable per-environment; it also sets the width of the open "trench" in
+  // front of the counter (x in [0, bayStart]) that the washer can drop into.
+  const DEFAULT_BAY_START = 68;
+  function normBayStart(s) { return (s == null) ? DEFAULT_BAY_START : Math.max(0, s); }
 
   // ---- World extents used to give the (semi-infinite) solids finite size -----
   // Chosen generously so their far edges never become the binding constraint.
@@ -42,28 +47,31 @@
   const WY_BOTTOM = -160;      // below the deepest bay
 
   /**
-   * Build the solid environment for a given bay depth.
+   * Build the solid environment for a given bay depth and start distance.
    * Returns convex polygons (for collision) plus annotated points for drawing.
    * @param {number} bayDepth depth of the bay below standard floor (>= 0)
+   * @param {number} [bayStart] step distance out from counter edge (default 68)
    */
-  function buildEnvironment(bayDepth) {
+  function buildEnvironment(bayDepth, bayStart) {
     const b = Math.max(0, bayDepth);
+    const s = normBayStart(bayStart);
 
     const counter = Geo.rect(
       (WX_LEFT + FRONT_EDGE_X) / 2, (COUNTER_BOTTOM + COUNTER_TOP) / 2,
       (FRONT_EDGE_X - WX_LEFT), (COUNTER_TOP - COUNTER_BOTTOM), 0);
 
-    // Floor solid is an L shape -> two convex blocks.
+    // Floor solid is an L shape -> two convex blocks, split at the step (x = s).
     const bayBlock = Geo.rect(
-      (WX_LEFT + STEP_X) / 2, (WY_BOTTOM + (-b)) / 2,
-      (STEP_X - WX_LEFT), ((-b) - WY_BOTTOM), 0);
+      (WX_LEFT + s) / 2, (WY_BOTTOM + (-b)) / 2,
+      (s - WX_LEFT), ((-b) - WY_BOTTOM), 0);
 
     const standardBlock = Geo.rect(
-      (STEP_X + WX_RIGHT) / 2, (WY_BOTTOM + 0) / 2,
-      (WX_RIGHT - STEP_X), (0 - WY_BOTTOM), 0);
+      (s + WX_RIGHT) / 2, (WY_BOTTOM + 0) / 2,
+      (WX_RIGHT - s), (0 - WY_BOTTOM), 0);
 
     return {
       bayDepth: b,
+      bayStart: s,
       // Convex pieces the washer must not penetrate, with labels for highlight.
       solids: [
         { name: 'counter', poly: counter },
@@ -72,7 +80,7 @@
       ],
       // Notable points / lines for rendering & reasoning.
       counterCorner: { x: FRONT_EDGE_X, y: COUNTER_BOTTOM },
-      stepCorner: { x: STEP_X, y: 0 },
+      stepCorner: { x: s, y: 0 },
       bayFloorY: -b,
       bounds: { WX_LEFT, WX_RIGHT, WY_TOP, WY_BOTTOM },
     };
@@ -114,9 +122,9 @@
    * A clear, upright starting pose: standing on the standard floor, a little to
    * the right of the step.
    */
-  function startPose(dims) {
+  function startPose(dims, bayStart) {
     return {
-      x: STEP_X + 25 + dims.depth / 2,
+      x: normBayStart(bayStart) + 25 + dims.depth / 2,
       y: dims.height / 2,
       angle: 0,
     };
@@ -141,8 +149,8 @@
   }
 
   return {
-    COUNTER_BOTTOM, COUNTER_THICKNESS, COUNTER_TOP, STEP_X, FRONT_EDGE_X,
-    WX_LEFT, WX_RIGHT, WY_TOP, WY_BOTTOM,
+    COUNTER_BOTTOM, COUNTER_THICKNESS, COUNTER_TOP, FRONT_EDGE_X,
+    DEFAULT_BAY_START, WX_LEFT, WX_RIGHT, WY_TOP, WY_BOTTOM,
     buildEnvironment, washerPoly, collisionReport, collides,
     startPose, goalPose, staticMinDepth,
   };

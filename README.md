@@ -28,16 +28,16 @@ Everything is a side-view cross-section, units in **centimetres**, with **y poin
                                               standard floor
                                      ┌──────────────────────  y = 0  (FIXED)
         bay floor                    │
-   ──────────────────────────────────┘  step, 68 cm out (FIXED)
-   y = −bayDepth                     x = 68
+   ──────────────────────────────────┘  step, bayStart cm out
+   y = −bayDepth                     x = bayStart
 ```
 
 | Quantity | Value | |
 |---|---|---|
 | Counter bottom above standard floor | **90 cm** | fixed |
-| Step distance from counter front edge | **68 cm** | fixed |
 | Standard floor elevation | **0 cm** | fixed (datum) |
 | Bay depth | configurable | the thing we optimize |
+| Bay start (step distance from counter edge) | configurable, default **68 cm** | also sets the front "trench" width |
 | Washer height `H` | configurable | |
 | Washer depth `D` | configurable | |
 
@@ -69,7 +69,8 @@ Two reference numbers help interpret the result:
 
 ### A result worth knowing
 
-Sweeping washer sizes shows a sharp regime change at **D = 68 cm** (the trench width):
+Sweeping washer sizes (at the default **68 cm** bay start) shows a sharp regime change at
+**D = bay start** — i.e. the width of the open "trench" in front of the counter:
 
 ```
 H\D        50     60     68     76     84      (min bay depth, cm)
@@ -79,16 +80,20 @@ H\D        50     60     68     76     84      (min bay depth, cm)
 108      18.4   18.4   22.2   31.1   37.8
 ```
 
-- A washer **shallower than the 68 cm trench** can be lowered straight into the open
-  area in front of the counter and slid under — bay depth ≈ the static floor.
+- A washer **shallower than the trench** can be lowered straight into the open area in
+  front of the counter and slid under — bay depth ≈ the static floor.
 - A washer **deeper than the trench** can't be lowered upright; it must be tilted and
   rotated under the counter's front corner, which demands a noticeably deeper bay.
+
+Because the trench width *is* the bay-start distance, widening the bay start moves that
+threshold out — e.g. an 80 × 100 cm washer needs ~40 cm of depth at a 30 cm bay start, but
+only ~10 cm (its static floor) once the bay start is 120 cm. Try it with the slider.
 
 If `H ≤ 90`, the washer fits under the counter with no bay at all.
 
 ## Controls
 
-- **Sliders / number boxes** — washer height, washer depth, bay depth.
+- **Sliders / number boxes** — washer height, washer depth, bay depth, bay start.
 - **Drag** the washer to move it; **scroll** or **`Q` / `E`** to rotate; **arrow keys** to
   nudge (hold **Shift** for bigger steps).
 - **Start pose / Installed pose** — jump the washer to the two reference poses.

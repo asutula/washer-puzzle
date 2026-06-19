@@ -54,15 +54,16 @@ console.log('— solver —');
 {
   // Short washer: fits under counter, no bay needed.
   const shortDims = { depth: 60, height: 80 };
+  const RES = { dx: 4, dy: 4, daDeg: 4 };
   let t = Date.now();
-  const r0 = Solver.findMinBayDepth(shortDims, { dx: 4, dy: 4, daDeg: 4 });
+  const r0 = Solver.findMinBayDepth(shortDims, 68, RES);
   console.log(`  short washer -> depth ${r0.depth}cm (${Date.now() - t}ms)`);
   ok(r0.feasible && r0.depth === 0, 'short washer needs no bay (depth 0)');
 
   // Tall washer: needs a bay deeper than the static minimum to rotate in.
   const tallDims = { depth: 60, height: 95 };
   t = Date.now();
-  const r1 = Solver.findMinBayDepth(tallDims, { dx: 4, dy: 4, daDeg: 4 });
+  const r1 = Solver.findMinBayDepth(tallDims, 68, RES);
   console.log(`  tall washer  -> depth ${r1.depth}cm, staticMin ${r1.staticMin}cm, ` +
               `path ${r1.path.length} poses (${Date.now() - t}ms)`);
   ok(r1.feasible, 'tall washer has a feasible insertion');
@@ -70,8 +71,17 @@ console.log('— solver —');
   ok(r1.path.length > 2, 'a non-trivial insertion path was returned');
 
   // Monotonicity: feasible at the solved depth, infeasible a good bit shallower.
-  ok(Solver.feasible(tallDims, r1.depth + 1, { dx: 4, dy: 4, daDeg: 4 }), 'feasible just above solved depth');
-  ok(!Solver.feasible(tallDims, r1.staticMin, { dx: 4, dy: 4, daDeg: 4 }), 'infeasible at the static minimum');
+  ok(Solver.feasible(tallDims, r1.depth + 1, 68, RES), 'feasible just above solved depth');
+  ok(!Solver.feasible(tallDims, r1.staticMin, 68, RES), 'infeasible at the static minimum');
+
+  // Bay-start effect: a deep washer (deeper than a narrow trench) needs more
+  // depth than when the trench is wide enough to lower it in upright.
+  const deepDims = { depth: 80, height: 100 };
+  const wide = Solver.findMinBayDepth(deepDims, 120, RES);
+  const narrow = Solver.findMinBayDepth(deepDims, 30, RES);
+  console.log(`  deep washer  -> wide-start ${wide.depth}cm vs narrow-start ${narrow.depth}cm`);
+  ok(wide.feasible && narrow.feasible, 'deep washer feasible at both bay starts');
+  ok(wide.depth < narrow.depth, 'wider bay start needs a shallower bay');
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

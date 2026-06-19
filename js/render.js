@@ -46,11 +46,12 @@
     this.cssH = rect.height;
   };
 
-  Renderer.prototype.setView = function (dims, bayDepth) {
+  Renderer.prototype.setView = function (dims, bayDepth, bayStart) {
     // Frame the relevant region with a little breathing room.
+    const s = (bayStart == null) ? Model.DEFAULT_BAY_START : bayStart;
     this.view = {
       minX: -90,
-      maxX: Model.STEP_X + 45 + dims.depth,
+      maxX: s + 45 + dims.depth,
       minY: -(bayDepth + 22),
       maxY: Math.max(Model.COUNTER_BOTTOM + 45, dims.height + 25),
     };
@@ -192,7 +193,7 @@
   };
 
   Renderer.prototype.drawAnnotations = function (dims, env) {
-    const C = Model.COUNTER_BOTTOM, S = Model.STEP_X, B = env.bayDepth;
+    const C = Model.COUNTER_BOTTOM, S = env.bayStart, B = env.bayDepth;
 
     // datum line at standard floor elevation
     this._line({ x: S, y: 0 }, { x: this.view.maxX, y: 0 }, COLORS.datum, 1, [5, 4]);
@@ -200,10 +201,10 @@
 
     // 90 cm: counter bottom above standard floor
     this._dimV(-30, 0, C, '90', 'left');
-    // 68 cm: step distance from counter front edge
-    this._dimH(0, S, 9, '68');
-    // bay depth
-    if (B > 0.05) this._dimV(40, 0, -B, 'bay ' + B.toFixed(1), 'right');
+    // step distance from counter front edge
+    if (S > 1) this._dimH(0, S, 9, String(Math.round(S)));
+    // bay depth — drawn in the open trench when there is one, else under counter
+    if (B > 0.05) this._dimV(S > 16 ? S * 0.5 : -25, 0, -B, 'bay ' + B.toFixed(1), 'right');
 
     this._text(S + 8, 0, 'standard floor', { dy: 16, color: COLORS.dim, font: '12px system-ui' });
     this._text(-85, -B, 'bay floor', { dy: 16, color: COLORS.dim, font: '12px system-ui' });

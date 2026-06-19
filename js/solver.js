@@ -31,9 +31,10 @@
     maxNodes: 4000000,
   };
 
-  /** Build the discretised configuration grid for one (dims, depth). */
-  function makeGrid(dims, depth, opts) {
+  /** Build the discretised configuration grid for one (dims, depth, bayStart). */
+  function makeGrid(dims, depth, bayStart, opts) {
     const o = Object.assign({}, DEFAULTS, opts);
+    const s = (bayStart == null) ? Model.DEFAULT_BAY_START : bayStart;
 
     // Snap angle bounds so that 0 is always on the grid.
     const daDeg = o.daDeg;
@@ -44,7 +45,7 @@
     const na = Math.round((aMaxDeg - aMinDeg) / daDeg) + 1;
 
     const xMin = Model.FRONT_EDGE_X - dims.depth - 15;
-    const xMax = Model.STEP_X + 35 + dims.depth;
+    const xMax = s + 35 + dims.depth;
     const yMin = -depth - 10;
     const yMax = Math.max(dims.height, Model.COUNTER_BOTTOM) + 25;
 
@@ -78,9 +79,9 @@
    * Plan an insertion path at a fixed bay depth.
    * @returns {{feasible:boolean, path:Array<pose>, stats:object, env:object}}
    */
-  function planAtDepth(dims, depth, opts) {
-    const env = Model.buildEnvironment(depth);
-    const g = makeGrid(dims, depth, opts);
+  function planAtDepth(dims, depth, bayStart, opts) {
+    const env = Model.buildEnvironment(depth, bayStart);
+    const g = makeGrid(dims, depth, bayStart, opts);
     const N = g.nx * g.ny * g.na;
     const idx = (i, j, k) => (i * g.ny + j) * g.na + k;
 
@@ -113,7 +114,7 @@
       return null;
     }
 
-    const start = anchor(Model.startPose(dims));
+    const start = anchor(Model.startPose(dims, bayStart));
     const goal = anchor(Model.goalPose(dims, depth));
     const stats = { nodes: 0, gridSize: N, grid: g };
     if (!start || !goal) {
@@ -173,28 +174,29 @@
     }
     path.reverse();
     // Pin the exact upright start/goal at the ends for a clean animation.
-    path.unshift(Model.startPose(dims));
+    path.unshift(Model.startPose(dims, bayStart));
     path.push(Model.goalPose(dims, depth));
     return { feasible: true, path, stats, env };
   }
 
-  function feasible(dims, depth, opts) {
-    return planAtDepth(dims, depth, opts).feasible;
+  function feasible(dims, depth, bayStart, opts) {
+    return planAtDepth(dims, depth, bayStart, opts).feasible;
   }
 
   /**
-   * Find the shallowest bay depth that admits an insertion path.
+   * Find the shallowest bay depth that admits an insertion path, for a given
+   * (fixed) bay start distance.
    * @returns {{depth:number|null, feasible:boolean, staticMin:number,
    *            path:Array<pose>, iterations:number, tolerance:number}}
    */
-  function findMinBayDepth(dims, opts) {
+  function findMinBayDepth(dims, bayStart, opts) {
     const o = Object.assign({ tolerance: 0.5 }, opts);
     const staticMin = Model.staticMinDepth(dims);
 
     // If the washer fits upright under the counter with no bay, it can simply be
     // slid straight in: no bay required.
-    if (staticMin <= 0 && feasible(dims, 0, o)) {
-      const plan = planAtDepth(dims, 0, o);
+    if (staticMin <= 0 && feasible(dims, 0, bayStart, o)) {
+      const plan = planAtDepth(dims, 0, bayStart, o);
       return { depth: 0, feasible: true, staticMin, path: plan.path, iterations: 1, tolerance: o.tolerance };
     }
 
@@ -202,21 +204,21 @@
     let hi = staticMin + Math.max(12, dims.height * 0.5);
     const hardCap = dims.height + 90;
     let guard = 0;
-    while (!feasible(dims, hi, o) && hi < hardCap && guard++ < 12) {
+    while (!feasible(dims, hi, bayStart, o) && hi < hardCap && guard++ < 12) {
       hi += Math.max(12, dims.height * 0.5);
     }
-    if (!feasible(dims, hi, o)) {
+    if (!feasible(dims, hi, bayStart, o)) {
       return { depth: null, feasible: false, staticMin, path: [], iterations: guard, tolerance: o.tolerance };
     }
 
     // lo is infeasible (at/below the static fit there is no room to rotate).
     let lo = staticMin;
     let iterations = 0;
-    let bestPlan = planAtDepth(dims, hi, o);
+    let bestPlan = planAtDepth(dims, hi, bayStart, o);
     while (hi - lo > o.tolerance) {
       const mid = (lo + hi) / 2;
       iterations++;
-      const plan = planAtDepth(dims, mid, o);
+      const plan = planAtDepth(dims, mid, bayStart, o);
       if (plan.feasible) { hi = mid; bestPlan = plan; }
       else { lo = mid; }
     }
