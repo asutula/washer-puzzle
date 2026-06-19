@@ -36,8 +36,8 @@ console.log('— model —');
   // Centre buried in the floor: collides.
   ok(Model.collides({ x: 150, y: -40, angle: 0 }, dims, env), 'washer sunk into floor collides');
 
-  // Centre up inside the counter slab: collides.
-  ok(Model.collides({ x: -30, y: 150, angle: 0 }, dims, env), 'washer inside counter collides');
+  // Washer overlapping the counter slab (10cm thick, y in [90,100]): collides.
+  ok(Model.collides({ x: -30, y: 95, angle: 0 }, dims, env), 'washer overlapping counter slab collides');
 
   // Goal with enough depth fits (H=95 needs >=5; give 20).
   ok(!Model.collides(Model.goalPose(dims, 20), dims, env), 'goal pose fits with adequate bay');

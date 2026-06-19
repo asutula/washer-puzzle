@@ -181,8 +181,8 @@
     this._dot(env.counterCorner, COLORS.counterEdge);
     this._dot(env.stepCorner, COLORS.floorEdge);
 
-    this._text(Model.WX_LEFT + 30, Model.COUNTER_BOTTOM + 32, 'Counter',
-      { color: '#fff', font: '14px system-ui' });
+    this._text(Model.WX_LEFT + 30, Model.COUNTER_BOTTOM + Model.COUNTER_THICKNESS / 2, 'Counter',
+      { color: '#fff', font: '13px system-ui', baseline: 'middle' });
   };
 
   Renderer.prototype._dot = function (pt, color) {

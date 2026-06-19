@@ -29,6 +29,8 @@
 
   // ---- Fixed dimensions (cm) -------------------------------------------------
   const COUNTER_BOTTOM = 90;   // bottom face of countertop above standard floor
+  const COUNTER_THICKNESS = 10; // countertop slab thickness (visual; top face only)
+  const COUNTER_TOP = COUNTER_BOTTOM + COUNTER_THICKNESS;
   const STEP_X = 68;           // step starts 68cm out from counter front edge
   const FRONT_EDGE_X = 0;      // counter front edge defines x = 0
 
@@ -48,8 +50,8 @@
     const b = Math.max(0, bayDepth);
 
     const counter = Geo.rect(
-      (WX_LEFT + FRONT_EDGE_X) / 2, (COUNTER_BOTTOM + WY_TOP) / 2,
-      (FRONT_EDGE_X - WX_LEFT), (WY_TOP - COUNTER_BOTTOM), 0);
+      (WX_LEFT + FRONT_EDGE_X) / 2, (COUNTER_BOTTOM + COUNTER_TOP) / 2,
+      (FRONT_EDGE_X - WX_LEFT), (COUNTER_TOP - COUNTER_BOTTOM), 0);
 
     // Floor solid is an L shape -> two convex blocks.
     const bayBlock = Geo.rect(
@@ -139,7 +141,7 @@
   }
 
   return {
-    COUNTER_BOTTOM, STEP_X, FRONT_EDGE_X,
+    COUNTER_BOTTOM, COUNTER_THICKNESS, COUNTER_TOP, STEP_X, FRONT_EDGE_X,
     WX_LEFT, WX_RIGHT, WY_TOP, WY_BOTTOM,
     buildEnvironment, washerPoly, collisionReport, collides,
     startPose, goalPose, staticMinDepth,
